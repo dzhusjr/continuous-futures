@@ -1,195 +1,93 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>Continuous Futures &amp; Roll Handling</title>
 <style>
-@page { size: A4; margin: 10mm 11mm; }
-body { font-family: "Source Serif Pro", Georgia, serif; font-size: 8.35pt; line-height: 1.21; color:#15181d; margin:0; }
-h1 { font-size: 13pt; margin:0 0 1pt 0; font-family:"Helvetica Neue",Arial,sans-serif; }
-.sub { font-size:8pt; color:#5a6069; margin-bottom:6pt; font-family:"Helvetica Neue",Arial,sans-serif;}
-h2 { font-size: 8.9pt; margin:5.5pt 0 1.5pt 0; font-family:"Helvetica Neue",Arial,sans-serif; color:#1a3a66;
-     border-bottom:0.6pt solid #c8d2de; padding-bottom:1pt;}
-p { margin:0 0 2.6pt 0; text-align:justify; }
-ul { margin:0 0 3.5pt 0; padding-left:12pt; } li { margin-bottom:1pt; }
-table { border-collapse:collapse; width:100%; font-size:7.3pt; margin:2pt 0 3pt 0;
-        font-family:"Helvetica Neue",Arial,sans-serif;}
-th { text-align:left; border-bottom:0.7pt solid #46546a; padding:1.6pt 4pt 1.6pt 0; font-weight:600; }
-td { padding:1.4pt 4pt 1.4pt 0; border-bottom:0.3pt solid #dde3ea; }
-td.n, th.n { text-align:right; font-variant-numeric: tabular-nums; }
-code { font-family:"SF Mono",Menlo,monospace; font-size:8pt; background:#f1f4f8; padding:0 2px; }
-.k { color:#1a3a66; font-weight:600; }
-.note { font-size:7.3pt; color:#5a6069; font-family:"Helvetica Neue",Arial,sans-serif; }
+@page { size: A4; margin: 15mm 17mm; }
+body { font-family: Georgia, serif; font-size: 10pt; line-height: 1.38; color:#15181d; margin:0; }
+h1 { font-size: 15pt; margin:0 0 2pt 0; font-family:"Helvetica Neue",Arial,sans-serif; }
+.sub { font-size:9pt; color:#5a6069; margin-bottom:8pt; font-family:"Helvetica Neue",Arial,sans-serif;}
+h2 { font-size: 10.5pt; margin:9pt 0 3pt 0; font-family:"Helvetica Neue",Arial,sans-serif; color:#1a3a66; }
+p { margin:0 0 4pt 0; }
+ul { margin:0 0 4pt 0; padding-left:14pt; } li { margin-bottom:2pt; }
+table { border-collapse:collapse; font-size:9pt; margin:3pt 0 5pt 0; font-family:"Helvetica Neue",Arial,sans-serif;}
+th { text-align:left; border-bottom:0.7pt solid #46546a; padding:2pt 12pt 2pt 0; font-weight:600; }
+td { padding:2pt 12pt 2pt 0; border-bottom:0.3pt solid #dde3ea; }
+code { font-family:Menlo,monospace; font-size:9pt; }
+.note { font-size:9pt; color:#5a6069; }
 </style></head><body>
 
 <h1>Continuous Futures &amp; Roll Handling</h1>
-<div class="sub">Part 1 on TY (10y UST) and RX (Euro-Bund) &middot; Part 2 on STIRs &middot; daily data 2020-01 to 2026-09, 22 roots</div>
+<div class="sub">Part 1 on TY (10y UST) and RX (Euro-Bund) &middot; Part 2 on STIRs &middot; daily data 2020&ndash;2026, 22 roots</div>
 
-<h2>1. The roll definition</h2>
-<p>I define the roll on <span class="k">open interest</span>, because open interest is where positions
-<em>are</em>, which is the quantity the downstream signal is about. Within a cycle &mdash; the span over which generic 1
-maps to one contract <code>C<sub>k</sub></code> and generic 2 to <code>C<sub>k+1</sub></code> &mdash; let
-<code>s<sub>t</sub> = OI<sub>front</sub>/(OI<sub>front</sub>+OI<sub>next</sub>)</code>. Three dates, each the first of
-<em>two consecutive</em> sessions satisfying the condition: <span class="k">roll start</span> <code>s&lt;0.85</code>,
-<span class="k">roll date</span> <code>s&lt;0.50</code>, <span class="k">roll end</span> <code>s&lt;0.15</code>.
-The series changes contract at the settlement of the roll date. A crossing is only accepted if <code>s</code> was above
-0.85 earlier in the same cycle, which makes the rule immune to a left-censored first cycle and to stale data.
-Thresholds act on a bounded ratio, so the same numbers run on a 3.9m-lot Treasury contract and a 150k-lot BTP contract
-unchanged &mdash; that is the whole point of the design, and section 6 is the test of it.</p>
-<p>The alternatives, implemented and compared rather than dismissed. <em>Volume crossover</em>: a flow, not a stock, and
-calendar-spread trades print on both legs, so both are inflated during the roll week. It crosses a median 2&ndash;3
-sessions <em>after</em> the OI rule and misfires outright on 1/26 TY and 2/26 RX cycles, where carried-forward volume at
-the provider's switch produces a spurious crossing. <em>Calendar / first-notice</em>: exact when the convention is right,
-and it agrees with my rule to within 1 session on all eleven bond roots &mdash; which is the evidence that the OI rule is
-picking up the real event. I did not choose it because it needs per-root delivery conventions, notice rules and an
-exchange holiday calendar, none of which is in the file, and it breaks silently when a contract changes spec or a new
-root is onboarded. It runs as a monitor (section 8), not as the definition.</p>
+<h2>1. Roll definition</h2>
+<p>I roll on <b>open interest</b>, because it shows where positions actually sit. With
+<code>s = OI<sub>front</sub> / (OI<sub>front</sub> + OI<sub>next</sub>)</code>, the <b>roll date</b> is the first of two
+consecutive sessions with <code>s &lt; 0.50</code>, provided <code>s</code> was above 0.85 earlier in the cycle
+(a crossing, not a level). The thresholds act on a ratio, so the same numbers work on every bond root.</p>
+<p><b>Alternatives.</b> <i>Volume</i> is noisy (calendar spreads trade both legs) and misfires on 1&ndash;2 cycles on TY and RX.
+A <i>calendar rule</i> (first notice / last trading day) agrees with mine within 1 session on all 11 bond roots, but needs
+per-exchange rules that are not in the data, so I use it as a cross-check rather than the definition.</p>
 
-<h2>2. The gap to the provider's generic (Part 1.2)</h2>
-<p>The provider's generic switches on the first session <em>after the expiring contract's last trading day</em>, not when
-the risk moves. The gap to my roll date is systematic, not noisy:</p>
+<h2>2. Gap to the provider's generic</h2>
+<p>The provider switches generic 1 only after the old contract stops trading, not when positions move:</p>
 <table>
-<tr><th>Contract group</th><th class="n">Gap, OI roll &rarr; generic switch (sessions)</th><th class="n">Days generic 1 is not the liquid contract</th></tr>
-<tr><td>CBOT Treasuries TU/FV (first notice)</td><td class="n">26 (med.)</td><td class="n">40&ndash;41%</td></tr>
-<tr><td>CBOT Treasuries TY/US/WN (first notice)</td><td class="n">19 (med., range 16&ndash;21)</td><td class="n">30%</td></tr>
-<tr><td>ICE Long Gilt (first notice)</td><td class="n">25 (med.)</td><td class="n">38%</td></tr>
-<tr><td>Eurex RX/OE/DU/OAT/IK (no notice period)</td><td class="n">4&ndash;5 (med., range 4&ndash;6)</td><td class="n">7%</td></tr>
+<tr><th>Group</th><th>Median gap (sessions)</th><th>Days generic 1 is wrong</th></tr>
+<tr><td>CBOT Treasuries / ICE Gilt</td><td>19&ndash;26</td><td>30&ndash;41%</td></tr>
+<tr><td>Eurex bonds</td><td>4&ndash;5</td><td>7%</td></tr>
 </table>
-<p>The split is entirely explained by the delivery mechanism. Contracts with a notice period force longs out at first
-notice (last business day of the month before delivery for CBOT), but keep trading for another three weeks as an
-illiquid stub; on TY the stub's open interest falls from 3.9m lots to 77 lots while generic 1 still points at it. Eurex
-contracts have no notice period, so liquidity stays until the last trading day and the provider's switch is nearly
-right. <strong>Consequence:</strong> for US Treasuries and Gilts, roughly 30&ndash;40% of all observations of "generic 1"
-describe a contract that no longer holds the risk. Any signal built on the raw front generic is wrong a third of the time,
-and the error is not random &mdash; it is concentrated in exactly the window a positioning signal cares about.</p>
+<p>Contracts with a notice period force holders out weeks before expiry, so on US Treasuries roughly a third of
+"generic 1" observations describe a contract that has already been abandoned (TY open interest drops from 3.9m to 77 lots).</p>
 
-<h2>3. Continuous price, and what each method distorts</h2>
-<p>I build three series on <em>my</em> roll date, and judge them against a benchmark that cannot be wrong: the
-<span class="k">splice return</span> of a position actually held and rolled, where both legs of every return come from
-the same contract. Roll gaps are always measured between the two contracts' settlements <em>on the same day</em>.</p>
-<ul>
-<li><span class="k">Difference (Panama)</span> &mdash; primary. Reproduces price <em>changes</em> exactly (verified to
-1e-9 in the test suite), so DV01 and points P&amp;L are right. Distorts levels (history is shifted by the sum of all
-future gaps; on TY that sum is only &minus;1.03 points over 27 rolls, 0.8% of price) and distorts percentage returns by
-up to 0.4&ndash;2 bp RMS.</li>
-<li><span class="k">Ratio</span> &mdash; reproduces log returns exactly (1e-12), distorts differences, and is undefined if
-price touches zero. That is not hypothetical: CL settled at &minus;37.63 on 2020-04-20.</li>
-<li><span class="k">Unadjusted provider generic 1</span> &mdash; wrong in both. It injects the calendar spread as a
-one-day return at each switch: 44.7 bp RMS / 120 bp max on TY (1.18 / 3.17 daily sigmas) and 115.8 bp / 278 bp on RX
-(2.66 / 6.39 sigmas).</li>
-</ul>
-<p>For bonds I take difference adjustment: the roll gap is carry plus the cheapest-to-deliver option, it is a level
-effect of a few 32nds, and everything downstream is additive in price points. Here the choice barely matters
-(gap ~30 bp on TY); in crude it decides the series (section 7).</p>
+<h2>3. Continuous price and open interest</h2>
+<p><b>Price:</b> difference (Panama) back-adjustment, judged against the true return of a held-and-rolled position.
+It keeps price changes exact, which is what matters for bonds; ratio adjustment keeps percentage returns exact but
+breaks when prices touch zero (crude printed &minus;37.63 in April 2020). The unadjusted generic injects a fake
+45&nbsp;bp jump at every roll on TY (116&nbsp;bp on RX).</p>
+<p><b>Open interest:</b> whole-curve aggregate OI. Generic-1 OI collapses to zero every quarter by construction;
+the aggregate does not care which contract is in front. Positioning is a z-score of log aggregate OI.</p>
 
-<h2>4. Continuous open interest</h2>
-<p>Generic-1 OI is not a positioning series &mdash; it collapses to zero every quarter by construction. I use
-<span class="k">whole-curve aggregate OI</span>, with <code>OI(1)+OI(2)</code> as the fallback where no aggregate is
-published. For quarterly bond futures these are the same series: <code>(OI1+OI2)/AGG</code> has median exactly 1.00000
-on every bond root, i.e. essentially all open interest sits in the front two contracts. The aggregate is preferred
-because it is immune to a data trap documented below. Positioning is then the normalised level &mdash; a 252-day
-z-score of log OI &mdash; and the front share <code>s<sub>t</sub></code> is reported <em>separately</em> as a roll-phase
-diagnostic, never as conviction. Migration is not a change in conviction and must not enter the same number.</p>
-
-<h2>5. Roll robustness: the metric and the result (Part 1.5)</h2>
-<p><span class="k">Roll Artefact Score (RAS)</span>. Standardise daily changes by a 60-day trailing volatility estimated
-from non-roll days only, then <code>RAS = median(|z| on roll days) / median(|z| elsewhere) &minus; 1</code>, with a
-10,000-draw permutation p-value. RAS = 0 means a roll day is indistinguishable from an ordinary day. Medians, so one
-March-2020 session cannot carry the result. The same statistic runs on returns and on &Delta;log OI, and each
-construction is scored on the days <em>it</em> rolls &mdash; scoring the provider's series on my dates would flatter it
-to exactly zero. Alongside it: <span class="k">injected jump</span> (RMS deviation from the splice benchmark on roll
-days) and <span class="k">calendar R&sup2;</span> (share of the positioning signal's variance explained by roll-phase
-dummies &mdash; how much of the "signal" is just the calendar).</p>
+<h2>4. Robustness metric</h2>
+<p><b>Roll Artefact Score:</b> standardise daily changes by normal-day volatility, then
+<code>RAS = median |z| on roll days / median |z| on other days &minus; 1</code>, with a permutation p-value.
+RAS&nbsp;=&nbsp;0 means roll days look like any other day.</p>
 <table>
-<tr><th>TY</th><th class="n">RAS</th><th class="n">p</th><th class="n">injected jump</th><th>Positioning series</th><th class="n">RAS</th><th class="n">calendar R&sup2;</th><th class="n">corr. w/ chosen</th></tr>
-<tr><td>provider generic 1</td><td class="n">+0.92</td><td class="n">0.0001</td><td class="n">44.7 bp</td><td>generic-1 OI</td><td class="n">64.9</td><td class="n">0.88</td><td class="n">0.14</td></tr>
-<tr><td>difference-adjusted</td><td class="n">&minus;0.22</td><td class="n">0.31</td><td class="n">0.40 bp</td><td>held-contract OI</td><td class="n">52.4</td><td class="n">0.50</td><td class="n">0.52</td></tr>
-<tr><td>ratio-adjusted</td><td class="n">&minus;0.21</td><td class="n">0.31</td><td class="n">0.00 bp</td><td>curve aggregate (chosen)</td><td class="n">3.16</td><td class="n">0.13</td><td class="n">1.00</td></tr>
-<tr><td>splice (benchmark)</td><td class="n">&minus;0.21</td><td class="n">0.31</td><td class="n">0.00 bp</td><td>aggregate, deseasonalised</td><td class="n">&mdash;</td><td class="n">0.0006</td><td class="n">0.93</td></tr>
+<tr><th>TY</th><th>RAS</th><th>p</th></tr>
+<tr><td>Provider generic-1 price</td><td>+0.92</td><td>0.0001</td></tr>
+<tr><td>Back-adjusted price</td><td>&minus;0.22</td><td>0.31</td></tr>
+<tr><td>Generic-1 OI</td><td>64.9</td><td></td></tr>
+<tr><td>Aggregate OI (chosen)</td><td>3.2</td><td></td></tr>
 </table>
-<p>Reading: the adjusted price series are statistically indistinguishable from ordinary days at the roll (p = 0.31), the
-unadjusted one is not (p = 0.0001). On the positioning side the median one-day move at a roll falls from 63% (generic 1)
-to 2.2% (aggregate), and the share of the signal that is pure calendar falls from 0.88 to 0.13. The residual 2.2% is
-<em>real</em>: open interest genuinely dips at a roll because some positions are closed rather than rolled. Removing the
-mean roll-phase shape takes calendar R&sup2; to 0.0006 while keeping 0.93 correlation with the raw signal &mdash; I report
-both and would let the downstream model choose. The damning number is the last column: a conviction signal built on
-generic-1 OI correlates <strong>0.14</strong> with the correct one on TY and 0.08 on RX. It is not a noisy version of the
-right signal; it is mostly a different, calendar-driven series.</p>
+<p>A positioning signal built on generic-1 OI correlates only 0.14 with the correct one: it mostly tracks the calendar.</p>
 
-<h2>6. Second bond future, nothing redesigned (Part 1.6)</h2>
-<p>RX run with identical thresholds, then all eleven bond roots swept. The definition holds: median roll length
-<strong>3 sessions</strong> on every root; the calendar cross-check agrees to <strong>&le;1 session</strong> everywhere;
-difference adjustment is insignificant at the roll on 10 of 11 roots. What <em>changes</em> is the gap to the provider's
-generic (4&ndash;5 sessions on Eurex vs 19&ndash;26 on CBOT/ICE) &mdash; and that is a property of the contract, not a
-failure of the rule; the rule is what measures it. The one exception worth flagging: on IK (BTP) the difference-adjusted
-series scores RAS +0.45 with p = 0.043, marginally significant. BTP has the largest and most volatile roll gap of the set
-(82 bp mean, driven by CTD switches and sovereign-spread moves), so a single same-day gap is a noisier estimate of the
-true carry there. I would not use a single-day gap for BTP in production (section 8).</p>
+<h2>5. Second bond future</h2>
+<p>RX and then all 11 bond roots ran with identical parameters: median roll of 3 sessions everywhere, calendar
+cross-check within 1 session, back-adjusted price clean on 10 of 11 roots (BTP is marginal because its roll gaps are the most volatile).</p>
 
-<h2>7. Part 2: STIRs &mdash; does "front vs next" even make sense?</h2>
-<p>No, and the data says so directly. On SOFR the front contract holds a median <strong>10.7%</strong> of curve open
-interest (Euribor 13.6%, SONIA 11.2%); against 99.0% for TY and 99.7% for RX. The <em>modal</em> largest contract is the
-2nd generic on SOFR and the 3rd on SONIA &mdash; the front is not even where most risk sits on a typical day. It takes
-four contracts to reach 45% and eight to reach 75&ndash;79%. So a front-vs-next roll relabels 11% of the book four times
-a year and calls the remaining 89% unchanged; the quantity it measures is not positioning in the curve.</p>
-<p>Surviving from Part 1: the OI-<em>migration</em> idea (generalised), the same-day gap rule for any splice, and RAS
-itself unchanged. What changes is the object made continuous. A strip is a term structure, not an asset, so I would build
-<span class="k">constant-maturity</span> continuations: for each target tenor (3m, 6m, 1y, 2y out) interpolate between
-the two bracketing quarterlies by time-to-expiry. That removes the roll entirely &mdash; weights move continuously, so
-there is no discontinuity to adjust. Positioning becomes (i) total strip OI, already roll-invariant; (ii) the OI-weighted
-<em>centre of mass</em> of the strip in months-to-expiry, the natural "where on the curve is the risk" statistic and the
-thing that actually moves when the hiking path reprices; (iii) pack aggregates (whites/reds/greens), because that is the
-traded unit. All of it DV01-weighted, not lot-weighted: a 4th-year lot and a front lot are not the same exposure, and lot
-counts assume they are. Caveat: deep-strip OI is 14.6% missing on SOFR beyond the 9th generic, so any strip aggregate
-needs an explicit coverage check first.</p>
+<h2>6. Part 2: short-term rate futures</h2>
+<p>"Front vs next" stops making sense: the front SOFR contract holds only ~11% of open interest, and it takes eight
+contracts to cover 75%. I would build <b>constant-maturity</b> series (interpolate between the two contracts around
+each target tenor, so there is no roll at all) and measure positioning as total strip OI plus its OI-weighted
+centre of mass along the curve, weighted by risk (DV01) rather than lot count.</p>
 
-<h2>8. Where this breaks, and how I would catch it in production</h2>
+<h2>7. Failure modes and production monitoring</h2>
 <ul>
-<li><span class="k">Stale data defeats the rule silently.</span> The provider forward-fills a generic's OI when the
-underlying has not started reporting: at the switch, generic 2 keeps the <em>previous</em> generic-2 contract's OI (TY,
-2020-06-22: 3,302,975 lots for seven sessions); and on Gilt, OAT, Schatz and Bobl generic-2 OI freezes for up to 47
-sessions at a level comparable to generic 1. Unfiltered, the front share sits at a meaningless ~0.5 and the detector fires
-a roll immediately after the previous one. I drop a value when the ticker changed but the value did not, or when it is the
-3rd member of a run of identical sessions; front-month OI on TY/RX/US/OE never trips this (max run 2), so the filter costs
-nothing where the data is good. <em>Monitor:</em> alert when reported OI(2) exceeds curve aggregate (it did on Gilt), on
-any identical-OI run &gt; 2 sessions, and on front-share flatlines.</li>
-<li><span class="k">The thresholds are calibrated to a two-contract world.</span> Run unchanged on WTI they fire
-<strong>zero</strong> rolls in 82 cycles, because crude's front share never exceeds 0.76 &mdash; OI is spread down a
-monthly curve (front = 14% of aggregate). This is the right failure: the rule declines rather than guessing.
-<em>Monitor:</em> alert on any cycle reaching its provider switch with no detected roll date, and on
-<code>max(s)</code> per cycle &lt; 0.85.</li>
-<li><span class="k">The same-day gap is a one-observation estimate.</span> It inherits any settlement-timing mismatch
-between legs and, on a CTD switch, a jump that is economics rather than noise. <em>Monitor:</em> z-score each roll gap
-against that contract's trailing distribution; flag anything beyond 3&sigma; (this is what would have caught the IK
-behaviour in section 6). A 3&ndash;5 day VWAP-weighted gap is the obvious hardening.</li>
-<li><span class="k">It assumes two liquid contracts and a stable cycle.</span> A spec change, a new contract, a
-dislocation that halts the roll, or a wrong holiday calendar all break it. <em>Monitor:</em> run the calendar rule in
-parallel daily and alert on divergence &gt; 2 sessions &mdash; two independent definitions disagreeing is the cheapest
-reliable canary. RAS itself is a ratio of medians over ~27 events and moves with the volatility regime, so I track it as
-a rolling 8-roll statistic with its permutation band, not a single number.</li>
+<li><b>Stale data:</b> the provider sometimes freezes OI for days, which fakes a roll. Filtered; alert on runs of identical values.</li>
+<li><b>Spread-out curves:</b> on crude the rule fires 0 times in 82 cycles, because no contract dominates. Alert when a cycle reaches expiry with no roll.</li>
+<li><b>Single-day roll gap:</b> one noisy settlement distorts the adjustment. Alert on gaps beyond 3&sigma;.</li>
+<li><b>Spec or calendar changes:</b> run the calendar rule in parallel and alert when the two disagree by more than 2 sessions.</li>
 </ul>
 
-<h2>9. With unlimited time</h2>
-<p>Rebuild from <em>individual contract</em> histories rather than generics, removing the provider's roll timing from the
-problem entirely. Roll over 3&ndash;5 sessions with volume weights instead of one date, which is what an executable
-position does and which cuts the sensitivity to any single settlement. Make the positioning series DV01-weighted, and
-decompose OI into liquidity-provision and informed components following Bessembinder &amp; Seguin, so that "conviction"
-is not just "more contracts". Validate externally against CFTC Commitments of Traders: if my roll-invariant OI measures
-positioning, it should track the COT aggregate through the roll &mdash; a testable claim I have not yet made. Finally test
-the end point that matters: does a signal on the adjusted series beat the same signal on the raw generic out of sample,
-after costs? Everything above is a prerequisite, not a result.</p>
+<h2>8. With unlimited time</h2>
+<p>Build from individual contract histories instead of generics; roll over 3&ndash;5 days instead of one; validate the
+positioning series against CFTC Commitments of Traders; and test whether a signal on the adjusted series actually
+beats the raw generic out of sample, after costs.</p>
 
 <h2>References</h2>
-<p class="note">Hong &amp; Yogo (2012), <em>What does futures market interest tell us about the macroeconomy and asset
-prices?</em>, JFE &mdash; why aggregate open interest, not front-contract OI, carries the macro signal; this is the paper
-that pushed me to treat the curve aggregate as the positioning object. &middot; Bessembinder &amp; Seguin (1993),
-<em>Price volatility, trading volume, and market depth</em>, JFQA &mdash; decomposing volume/OI into expected
-(liquidity) and unexpected (informed) components; the basis for the "what next" item above. &middot; CME Group
-Treasury futures contract specifications (first notice day, last trading day) and Eurex fixed-income product
-specifications (delivery day, last trading day) &mdash; for the calendar comparator in section 1. &middot; Masteika,
-Rutkauskas &amp; Alexander (2012), <em>Continuous futures data series for back testing</em> &mdash; standard reference
-for Panama vs ratio back-adjustment and their respective distortions.</p>
+<p class="note">Hong &amp; Yogo (2012), <i>What does futures market interest tell us about the macroeconomy and asset prices?</i>, JFE &middot;
+Bessembinder &amp; Seguin (1993), <i>Price volatility, trading volume, and market depth</i>, JFQA &middot;
+Masteika, Rutkauskas &amp; Alexander (2012), <i>Continuous futures data series for back testing</i> &middot;
+CME and Eurex contract specifications.</p>
 
 <h2>Time and tools</h2>
-<p class="note">Roughly 5 hours: ~1h on the data (the staleness traps took most of it), ~1.5h on the roll definition and
-the comparison with the provider's generic, ~1h on the continuous price and OI constructions, ~45m on the metric and the
-cross-root sweep, ~45m on Part 2 and this write-up. AI (Claude) was used for boilerplate code, documentation and tests;
-the roll definition, data-cleaning decisions, metric design and the Part 2 reasoning are mine.</p>
+<p class="note">About 5 hours. AI (Claude) was used for boilerplate code, documentation and tests; the roll
+definition, data-cleaning decisions, metric design and the Part 2 reasoning are mine.</p>
 
 </body></html>
