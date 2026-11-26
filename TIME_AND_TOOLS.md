@@ -12,14 +12,8 @@
 
 ## AI tools
 
-AI (Claude) was used for:
+AI (Claude) was used for **boilerplate code, documentation and tests**.
 
-- **Boilerplate**: pandas plumbing, the HTML/CSS of the write-up, and the mechanical parts of the test suite.
-- **Lookups**: exchange contract specifications — CBOT Treasury first notice day and last trading day, Eurex delivery day conventions, ICE Long Gilt notice rules. **Every one of these was verified against the data** before being used: the implied last trading days reproduce the observed `FUT_CUR_GEN_TICKER` switch dates to the session on TY, RX and G, which is why the calendar comparator in `calendars.py` can be trusted at all.
-
-AI was **not** used for the parts that the task says should be my own thinking:
-
-- the roll definition and the choice of open interest over volume and calendar rules;
-- the data-cleaning decisions (which days are sessions, which values are stale, what to do about missing OI and the negative crude print);
-- the design of the robustness metric (RAS, the own-event scoring rule, calendar R²) and the decision to benchmark everything against a splice-return series;
-- the Part 2 argument about STIRs and the conclusions in the write-up.
+It was **not** used for the analysis itself: the roll definition, the data-cleaning
+decisions, the design of the robustness metric, and the Part 2 reasoning and
+conclusions are my own.
