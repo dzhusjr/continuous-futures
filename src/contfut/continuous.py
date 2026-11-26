@@ -29,7 +29,7 @@ def continuous_price(panel: RootPanel, rolls: pd.DataFrame, sel: pd.DataFrame):
     # true P&L: price of yesterday's held contract, today and yesterday
     prev = held.shift(1).fillna(held.iloc[0])
     today_prev_contract = _lookup(px, idx, prev)
-    splice_ret = np.log(today_prev_contract / raw.shift(1))
+    splice_ret = np.log((today_prev_contract / raw.shift(1)).where(lambda r: r > 0))
     splice_diff = today_prev_contract - raw.shift(1)
 
     gaps = pd.DataFrame([
@@ -56,7 +56,7 @@ def continuous_price(panel: RootPanel, rolls: pd.DataFrame, sel: pd.DataFrame):
                         "ret_splice": splice_ret, "diff_splice": splice_diff})
     for name, col in [("naive_gen1", "px_naive_gen1"), ("adj_diff", "px_adj_diff"),
                       ("adj_ratio", "px_adj_ratio")]:
-        out[f"ret_{name}"] = np.log(out[col]).diff()
+        out[f"ret_{name}"] = np.log(out[col].where(out[col] > 0)).diff()
     out["diff_adj_diff"] = out["px_adj_diff"].diff()
     out["diff_naive_gen1"] = out["px_naive_gen1"].diff()
     return out, gaps

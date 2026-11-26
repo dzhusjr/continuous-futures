@@ -13,14 +13,14 @@ eleven bond roots in the file.
 ## Run it
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# everything: tables and headline numbers (~15 s)
 python scripts/run_analysis.py --data data/FUT_raw_data.csv
-
-# the claims in the write-up, as assertions (113 tests, ~2 s)
 python -m pytest tests -q
 ```
+
+The run writes every table and headline number (~15 s); the tests are the
+write-up's claims as assertions (113 tests, ~2 s).
 
 Outputs land in `outputs/`: `tables/*.csv` and `headline_numbers.json`.
 

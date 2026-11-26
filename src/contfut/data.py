@@ -38,7 +38,7 @@ def traded_calendar(root_df: pd.DataFrame, activity_cols=ACTIVITY_COLS) -> pd.Da
     flag = d.assign(_c=changed).groupby("DATE")["_c"].any()
     flag.iloc[0] = True                               # no predecessor for the first date
     idx = pd.DatetimeIndex(flag[flag].index)
-    return idx[idx.dayofweek < 5]
+    return idx[idx.day_of_week < 5]
 
 
 def stale_mask(values: pd.DataFrame, tickers: pd.DataFrame, max_run: int = 2) -> pd.DataFrame:
@@ -52,8 +52,8 @@ def stale_mask(values: pd.DataFrame, tickers: pd.DataFrame, max_run: int = 2) ->
         if col in tickers.columns:
             new_contract = (tickers[col] != tickers[col].shift()) & (v == v.shift())
             # a carry stays invalid until the value finally moves
-            carried = new_contract | (new_contract.where(new_contract).ffill().fillna(False)
-                                      .astype(bool) & (v == v.shift()))
+            carried = new_contract | (new_contract.astype(float).where(new_contract).ffill()
+                                      .fillna(0).astype(bool) & (v == v.shift()))
         out[col] = (long_run | carried).fillna(False)
     return pd.DataFrame(out, index=values.index)
 

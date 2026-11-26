@@ -125,7 +125,7 @@ def test_no_forward_filled_days_survive(built):
 
 
 def test_weekends_removed(built):
-    assert (built["panel"].px.index.dayofweek < 5).all()
+    assert (built["panel"].px.index.day_of_week < 5).all()
 
 
 def test_stale_filter_leaves_front_month_alone(built):

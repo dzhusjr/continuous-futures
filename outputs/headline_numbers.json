@@ -17,7 +17,7 @@
     "RAS_price_provider_p": 0.0001,
     "injected_jump_bp_provider": 44.65073769952693,
     "injected_jump_sigma_provider": 1.1767937489779035,
-    "RAS_price_diffadj": -0.21554075801425332,
+    "RAS_price_diffadj": -0.21554075801425387,
     "RAS_price_diffadj_p": 0.3057,
     "injected_jump_bp_diffadj": 0.40259015930114367,
     "RAS_oi_generic1": 64.94638946624772,
@@ -25,7 +25,7 @@
     "calendar_r2_generic1": 0.8764738205010582,
     "calendar_r2_chosen": 0.1308007495808321,
     "calendar_r2_deseason": 0.0006477783271593429,
-    "corr_generic1_vs_chosen": 0.14244604315976647
+    "corr_generic1_vs_chosen": 0.1424460431597665
   },
   "RX": {
     "root": "RX",
@@ -53,7 +53,7 @@
     "calendar_r2_generic1": 0.7848864483744974,
     "calendar_r2_chosen": 0.203929961531772,
     "calendar_r2_deseason": 0.0008309636310603885,
-    "corr_generic1_vs_chosen": 0.08235619468612704
+    "corr_generic1_vs_chosen": 0.08235619468612701
   },
   "cross_root": {
     "n_roots": 11,
