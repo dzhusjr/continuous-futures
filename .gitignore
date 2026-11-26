@@ -1,0 +1,7 @@
+# the provided data file is not redistributed here; drop FUT_raw_data.csv into data/
+data/*.csv
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
